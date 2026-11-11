@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-REX Deployment Console</title>
+<style>
+  :root {
+    --bg: #0b1020; --panel: #121933; --panel2: #172042; --line: #243058; --text: #e8ecff; --muted: #8d98c4;
+    --accent: #6c8cff; --accent2: #9a6bff; --good: #2fd38a; --warn: #ffb84d; --bad: #ff6b7d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f3f5fb; --panel: #ffffff; --panel2: #f6f8ff; --line: #dde2f2; --text: #151a33; --muted: #5d6892; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+  header { padding: 20px 28px 0; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
+  h1 { margin: 0; font-size: 20px; letter-spacing: .2px; }
+  .sub { color: var(--muted); margin-top: 2px; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: 12px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--good); } .dot.bad { background: var(--bad); }
+
+  .overall { margin: 18px 28px 0; padding: 18px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+  .overall-top { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+  .pct { font-size: 30px; font-weight: 700; }
+  .meta { color: var(--muted); }
+  .bar { position: relative; height: 14px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; margin: 12px 0 10px; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .5s ease; }
+  .bar.active > i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.35) 50%, transparent 70%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  .phases { display: flex; gap: 6px; }
+  .phase-seg { flex: 1; font-size: 12px; color: var(--muted); }
+  .phase-seg .track { height: 4px; border-radius: 4px; background: var(--panel2); margin-bottom: 4px; overflow: hidden; }
+  .phase-seg .track i { display: block; height: 100%; width: 0; background: var(--good); transition: width .5s; }
+  .toolbar { display: flex; gap: 10px; margin-top: 14px; }
+
+  main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 20px; padding: 20px 28px 40px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin-bottom: 18px; }
+  .card h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+
+  button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); padding: 8px 14px; transition: .15s; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: linear-gradient(90deg, var(--accent), var(--accent2)); border-color: transparent; color: #fff; font-weight: 600; }
+  button.ghost { background: transparent; }
+  button.small { padding: 5px 10px; font-size: 12px; }
+
+  .phase-head { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 10px; }
+  .phase-head h3 { margin: 0; font-size: 15px; }
+  .phase-head span { color: var(--muted); font-size: 12px; }
+  .step { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; background: var(--panel2); transition: border-color .2s, box-shadow .2s; }
+  .step.running { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .step.done { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+  .step.error { border-color: var(--bad); }
+  .num { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 12px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+  .step.done .num { background: var(--good); border-color: var(--good); color: #052; }
+  .step.error .num { background: var(--bad); border-color: var(--bad); color: #fff; }
+  .step.running .num { border-color: var(--accent); color: var(--accent); }
+  .step.running .num::before { content: ""; position: absolute; width: 34px; height: 34px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--accent); animation: spin .8s linear infinite; }
+  .num { position: relative; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .title { font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .desc { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .tag { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-weight: 500; }
+  .tag.kms { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+  button.link { background: none; border: 0; padding: 4px 0 0; color: var(--accent); font-size: 12px; }
+  .details { margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 12.5px; }
+  .details p { margin: 0 0 6px; } .details ul { margin: 0 0 8px; padding-left: 18px; color: var(--muted); } .details li { margin: 2px 0; }
+  .details .who { font-size: 12px; color: var(--accent); }
+  .mini { height: 5px; border-radius: 5px; background: var(--panel); margin-top: 8px; overflow: hidden; }
+  .mini i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  .step.done .mini i { background: var(--good); }
+  .step-meta { font-size: 12px; color: var(--muted); margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .err { color: var(--bad); font-size: 12.5px; margin-top: 6px; word-break: break-word; }
+  .actions { text-align: right; min-width: 96px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .time { font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .time.done { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+  .time.live { color: var(--accent); border-color: var(--accent); }
+  .phase-head .ptime { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+  .check { color: var(--good); font-weight: 600; }
+
+  .acct { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .acct:first-of-type { border-top: 0; }
+  .acct .addr { font-size: 12px; color: var(--muted); }
+  .acct a, .addr-row a { color: var(--accent); text-decoration: none; }
+  .bal { font-weight: 600; } .bal.zero { color: var(--warn); }
+  .addr-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+  .addr-row:first-of-type { border-top: 0; }
+  .addr-row .k { color: var(--muted); }
+  .empty { color: var(--muted); font-size: 12.5px; }
+  #log { height: 280px; overflow: auto; background: #060913; color: #c8d2ff; border-radius: 10px; padding: 10px 12px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; border: 1px solid var(--line); }
+  #log .warn { color: var(--warn); } #log .error { color: var(--bad); }
+  .banner { margin: 16px 28px 0; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--panel)); }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--bad); color: #fff; padding: 10px 16px; border-radius: 10px; display: none; }
+  [hidden] { display: none !important; }
+  #modal { position: fixed; inset: 0; background: rgba(5,8,20,.65); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-box { background: var(--panel); border: 1px solid var(--accent); border-radius: 14px; padding: 22px 26px; max-width: 460px; text-align: center; }
+  .modal-box h3 { margin: 0 0 8px; } .modal-box p { white-space: pre-line; color: var(--muted); word-break: break-all; margin: 0 0 14px; }
+  .spin { width: 26px; height: 26px; margin: 0 auto 14px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>T-REX Deployment Console</h1>
+    <div class="sub" id="deal">Loading…</div>
+  </div>
+  <div class="badges">
+    <span class="badge"><span class="dot" id="conn-dot"></span><span id="conn-text">Connecting</span></span>
+    <span class="badge">Sepolia · 11155111</span>
+    <span class="badge">Admin: env key</span>
+    <span class="badge">Investors: MetaMask</span>
+  </div>
+</header>
+
+<div class="banner" id="banner" hidden></div>
+
+<section class="overall">
+  <div class="overall-top">
+    <div><span class="pct" id="pct">0%</span> <span class="meta" id="pct-meta"></span></div>
+    <div class="meta" id="elapsed"></div>
+  </div>
+  <div class="bar" id="bar"><i id="bar-fill"></i></div>
+  <div class="phases" id="phase-bars"></div>
+  <div class="toolbar">
+    <button class="ghost" id="reset">Reset local progress</button>
+  </div>
+</section>
+
+<main>
+  <div id="steps"></div>
+  <aside>
+    <div class="card">
+      <h2>Investors (MetaMask)</h2>
+      <div class="empty" style="margin-bottom:8px">Pick the account in MetaMask for each investor. One account can be used for all three, or use a different one each. It needs Sepolia ETH, and must differ from the admin account.</div>
+      <div id="investors"></div>
+    </div>
+    <div class="card">
+      <h2>Accounts <button class="small ghost" id="refresh">Refresh</button></h2>
+      <div id="accounts"></div>
+    </div>
+    <div class="card">
+      <h2>Deployed contracts</h2>
+      <div id="addresses"><div class="empty">Nothing deployed yet.</div></div>
+    </div>
+    <div class="card">
+      <h2>Live log <button class="small ghost" id="clear-log">Clear</button></h2>
+      <div id="log" class="mono"></div>
+    </div>
+  </aside>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const PHASES = { A: 'Phase A · Platform setup', B: 'Phase B · Create a deal', C: 'Phase C · Run the deal' };
+const PHASE_NOTE = { A: 'deploy once, shared by all deals', B: 'one transaction', C: 'settlement' };
+const LABELS = {
+  tokenImpl: 'Token implementation', ctrImpl: 'ClaimTopicsRegistry impl', tirImpl: 'TrustedIssuersRegistry impl', irsImpl: 'IdentityRegistryStorage impl',
+  irImpl: 'IdentityRegistry impl', mcImpl: 'ModularCompliance impl', ia: 'Implementation Authority', idFactory: 'IdFactory', factory: 'TREXFactory',
+  gateway: 'TREXGateway', supplyLimitModule: 'SupplyLimitModule (proxy)', cashToken: 'MockCashToken (EURd)', dvd: 'DVDTransferManager',
+  token: 'Bond token', identityRegistry: 'Identity Registry', compliance: 'Compliance'
+};
+let snap = null, startedAt = null, timer = null;
+const openDetails = new Set();
+
+const short = (a) => a.slice(0, 8) + '…' + a.slice(-6);
+const fmt = (ms) => ms < 1000 ? ms + 'ms' : ms < 60000 ? (ms / 1000).toFixed(1) + 's' : Math.floor(ms / 60000) + 'm ' + Math.round((ms % 60000) / 1000) + 's';
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 4500); }
+
+async function post(url) {
+  const r = await fetch(url, { method: 'POST' });
+  if (!r.ok) { const b = await r.json().catch(() => ({})); toast(b.error || 'Request failed'); }
+}
+
+// ---------------------------------------------------------------------------
+// MetaMask (investors sign in the browser)
+// ---------------------------------------------------------------------------
+const SEPOLIA_HEX = '0xaa36a7';
+const handled = new Set();
+async function postJSON(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.error || 'Request failed'); }
+}
+function metamask() {
+  if (!window.ethereum) throw new Error('MetaMask not found. Install the extension and reload this page.');
+  return window.ethereum;
+}
+async function ensureSepolia(eth) {
+  await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: SEPOLIA_HEX }] });
+}
+async function assignInvestor(label) {
+  try {
+    const eth = metamask();
+    await ensureSepolia(eth);
+    await eth.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] }); // account picker
+    const accounts = await eth.request({ method: 'eth_requestAccounts' });
+    await postJSON('/api/investor', { label, address: accounts[0] });
+  } catch (e) { toast(e.message || String(e)); }
+}
+function showModal(title, text) {
+  let m = $('modal');
+  if (!m) {
+    m = el('div'); m.id = 'modal';
+    m.innerHTML = '<div class="modal-box"><h3></h3><p></p><div class="spin"></div><button class="ghost small" id="modal-cancel">Cancel</button></div>';
+    document.body.append(m);
+  }
+  m.querySelector('h3').textContent = title; m.querySelector('p').textContent = text; m.style.display = 'flex';
+}
+function hideModal() { const m = $('modal'); if (m) m.style.display = 'none'; }
+async function handlePending(p) {
+  if (handled.has(p.id)) return;
+  handled.add(p.id);
+  let cancelled = false;
+  showModal('Confirm in MetaMask · ' + p.investor, p.description + '\nAccount: ' + p.from);
+  $('modal-cancel').onclick = async () => { cancelled = true; hideModal(); try { await postJSON('/api/investor-tx/' + p.id, { error: 'Cancelled in the UI' }); } catch {} };
+  try {
+    const eth = metamask();
+    await ensureSepolia(eth);
+    let accounts = await eth.request({ method: 'eth_accounts' });
+    if (!accounts.some((a) => a.toLowerCase() === p.from.toLowerCase())) {
+      showModal('Select the right account · ' + p.investor, 'In MetaMask, make ' + p.from + ' available to this page, then confirm.');
+      await eth.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
+      accounts = await eth.request({ method: 'eth_requestAccounts' });
+      if (!accounts.some((a) => a.toLowerCase() === p.from.toLowerCase())) throw new Error(p.investor + ' must use ' + p.from + ' in MetaMask');
+      showModal('Confirm in MetaMask · ' + p.investor, p.description + '\nAccount: ' + p.from);
+    }
+    const hash = await eth.request({ method: 'eth_sendTransaction', params: [{ from: p.from, to: p.to, data: p.data }] });
+    showModal('Waiting for confirmation · ' + p.investor, 'Transaction sent: ' + hash);
+    if (!cancelled) await postJSON('/api/investor-tx/' + p.id, { hash });
+  } catch (e) {
+    if (!cancelled) { toast(e.message || String(e)); try { await postJSON('/api/investor-tx/' + p.id, { error: e.message || String(e) }); } catch {} }
+  }
+}
+
+function render(s) {
+  snap = s;
+  $('deal').textContent = `${s.deal.name} · ${s.deal.symbol} · ${s.deal.supply.toLocaleString()} bonds`;
+  const banner = $('banner');
+  banner.hidden = !s.initError;
+  if (s.initError) banner.textContent = 'Setup problem: ' + s.initError;
+
+  const { txDone, txTotal, stepsDone, stepsTotal } = s.totals;
+  const pct = Math.round((txDone / txTotal) * 100);
+  $('pct').textContent = pct + '%';
+  $('pct-meta').textContent = `${stepsDone}/${stepsTotal} steps · ${txDone}/${txTotal} transactions mined`;
+  $('bar-fill').style.width = pct + '%';
+  $('bar').classList.toggle('active', !!s.running);
+
+  // phase mini bars
+  const pb = $('phase-bars'); pb.replaceChildren();
+  for (const p of ['A', 'B', 'C']) {
+    const steps = s.steps.filter((x) => x.phase === p);
+    const total = steps.reduce((a, x) => a + x.expectedTx, 0);
+    const done = steps.reduce((a, x) => a + (x.status === 'done' ? x.expectedTx : Math.min(x.txDone, x.expectedTx)), 0);
+    const seg = el('div', 'phase-seg');
+    const track = el('div', 'track'); const fill = el('i'); fill.style.width = (done / total * 100) + '%'; track.append(fill);
+    seg.append(track, el('div', null, PHASES[p]));
+    pb.append(seg);
+  }
+
+  $('reset').disabled = !!s.running || !!s.runningPhase;
+
+  // steps
+  const root = $('steps'); root.replaceChildren();
+  for (const p of ['A', 'B', 'C']) {
+    const head = el('div', 'phase-head'); head.append(el('h3', null, PHASES[p]), el('span', null, PHASE_NOTE[p]));
+    const pms = s.steps.filter((x) => x.phase === p && x.status === 'done').reduce((a, x) => a + (x.durationMs || 0), 0);
+    if (pms) head.append(el('span', 'ptime', 'Phase total ' + fmt(pms)));
+    const ph = s.phases.find((x) => x.id === p);
+    const running = s.runningPhase === p;
+    const pbtn = el('button', ph.canRun ? 'primary' : '',
+      ph.done ? '✓ Phase ' + p + ' complete' : running ? 'Running…' : ph.failed ? 'Retry phase ' + p : ph.started ? 'Resume phase ' + p : '▶ Run phase ' + p);
+    pbtn.disabled = !ph.canRun; pbtn.onclick = () => post('/api/phase/' + p);
+    if (!pms) pbtn.style.marginLeft = 'auto'; else pbtn.style.marginLeft = '12px';
+    if (ph.hint && !ph.done) { const h = el('span', 'ptime', ph.hint); h.style.color = 'var(--warn)'; h.style.marginLeft = 'auto'; pbtn.style.marginLeft = '12px'; head.append(h); }
+    head.append(pbtn);
+    root.append(head);
+    for (const st of s.steps.filter((x) => x.phase === p)) {
+      const row = el('div', 'step ' + st.status);
+      const num = el('div', 'num', st.status === 'done' ? '✓' : st.status === 'error' ? '!' : st.id.split('-')[0]);
+      const body = el('div');
+      const title = el('div', 'title'); title.append(el('span', null, (st.id.startsWith('11') ? 'Step 11-12 · ' : 'Step ' + st.id + ' · ') + st.title));
+      title.append(el('span', 'tag ' + (st.signer === 'kms' ? 'kms' : ''), st.signer === 'kms' ? 'Admin-signed' : 'Admin + investor (MetaMask)'));
+      body.append(title, el('div', 'desc', st.desc));
+      if (st.details) {
+        const open = openDetails.has(st.id);
+        const tg = el('button', 'link', (open ? '▾ Hide details' : '▸ Details'));
+        tg.onclick = () => { open ? openDetails.delete(st.id) : openDetails.add(st.id); render(snap); };
+        body.append(tg);
+        if (open) {
+          const box = el('div', 'details');
+          box.append(el('p', 'why', st.details.why));
+          const ul = el('ul'); st.details.what.forEach((w) => ul.append(el('li', null, w))); box.append(ul);
+          box.append(el('div', 'who', 'Signed by: ' + st.details.signers));
+          body.append(box);
+        }
+      }
+      const mini = el('div', 'mini'); const mf = el('i');
+      mf.style.width = (st.status === 'done' ? 100 : st.txDone / st.expectedTx * 100) + '%'; mini.append(mf); body.append(mini);
+      const meta = el('div', 'step-meta');
+      meta.append(el('span', null, `${st.status === 'done' ? st.expectedTx : st.txDone}/${st.expectedTx} tx`));
+      if (st.durationMs != null) meta.append(el('span', null, fmt(st.durationMs)));
+      if (st.status === 'running') meta.append(el('span', null, 'waiting for confirmations…'));
+      const hashes = s.txs.filter((t) => t.step === st.id);
+      for (const t of hashes.slice(-3)) { const a = el('a', 'mono', t.hash.slice(0, 10) + '…'); a.href = s.explorer + '/tx/' + t.hash; a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'var(--accent)'; a.title = t.label; meta.append(a); }
+      body.append(meta);
+      if (st.error) body.append(el('div', 'err', st.error));
+      const act = el('div', 'actions');
+      if (st.status === 'running' && st.startedAt) {
+        const t = el('span', 'time live', '⏱ ' + fmt(Date.now() - st.startedAt)); t.dataset.start = st.startedAt; act.append(t);
+      } else if (st.durationMs != null) {
+        act.append(el('span', 'time' + (st.status === 'done' ? ' done' : ''), '⏱ ' + fmt(st.durationMs)));
+      }
+      if (st.status === 'done') act.append(el('span', 'check', 'Done'));
+      else if (st.status === 'running') act.append(el('span', 'meta', 'In progress'));
+      else if (st.status === 'error') {
+        const rb = el('button', 'primary small', 'Retry this step');
+        rb.disabled = !st.canRetry; rb.onclick = () => post('/api/step/' + encodeURIComponent(st.id));
+        act.append(rb);
+      }
+      else act.append(el('span', 'meta', 'Waiting'));
+      row.append(num, body, act); root.append(row);
+    }
+  }
+
+  // investors (MetaMask)
+  const iv = $('investors'); iv.replaceChildren();
+  for (const inv of s.investors) {
+    const row = el('div', 'acct');
+    const left = el('div'); left.append(el('div', null, inv.label + ' · ' + inv.bonds.toLocaleString() + ' bonds'));
+    if (inv.address) { const a = el('a', 'mono addr', short(inv.address)); a.href = s.explorer + '/address/' + inv.address; a.target = '_blank'; a.rel = 'noopener'; left.append(a); }
+    else left.append(el('div', 'addr', 'No account assigned'));
+    const b = el('button', 'small' + (inv.address ? '' : ' primary'), inv.address ? 'Change' : 'Use MetaMask account');
+    b.disabled = s.investorsLocked || !!s.running || !!s.runningPhase;
+    b.title = s.investorsLocked ? 'Already whitelisted on chain' : '';
+    b.onclick = () => assignInvestor(inv.label);
+    row.append(left, b); iv.append(row);
+  }
+
+  // accounts
+  const acc = $('accounts'); acc.replaceChildren();
+  if (!s.accounts.length) acc.append(el('div', 'empty', s.initError ? 'Unavailable until setup is fixed.' : 'Loading…'));
+  for (const a of s.accounts) {
+    const row = el('div', 'acct');
+    const left = el('div'); left.append(el('div', null, a.label + ' · ' + a.role));
+    const link = el('a', 'mono addr', short(a.address)); link.href = s.explorer + '/address/' + a.address; link.target = '_blank'; link.rel = 'noopener'; left.append(link);
+    const bal = el('div', 'bal' + (Number(a.balance) === 0 ? ' zero' : ''), Number(a.balance).toFixed(4) + ' ETH');
+    row.append(left, bal); acc.append(row);
+  }
+
+  // addresses
+  const ad = $('addresses'); ad.replaceChildren();
+  const keys = Object.keys(LABELS).filter((k) => s.addresses[k]);
+  if (!keys.length) ad.append(el('div', 'empty', 'Nothing deployed yet.'));
+  for (const k of keys) {
+    const row = el('div', 'addr-row'); row.append(el('span', 'k', LABELS[k]));
+    const a = el('a', 'mono', short(s.addresses[k])); a.href = s.explorer + '/address/' + s.addresses[k]; a.target = '_blank'; a.rel = 'noopener'; a.title = s.addresses[k];
+    row.append(a); ad.append(row);
+  }
+
+  if (s.pendingTx) handlePending(s.pendingTx); else hideModal();
+
+  // live timers: running step pill + overall total (finished steps + current step)
+  clearInterval(timer);
+  const doneMs = s.steps.reduce((a, x) => a + (x.status === 'done' ? x.durationMs || 0 : 0), 0);
+  const tick = () => {
+    const cur = s.steps.find((x) => x.status === 'running' && x.startedAt);
+    const live = cur ? Date.now() - cur.startedAt : 0;
+    document.querySelectorAll('.time[data-start]').forEach((n) => n.textContent = '⏱ ' + fmt(Date.now() - Number(n.dataset.start)));
+    const total = doneMs + live;
+    $('elapsed').textContent = total ? 'Total time ' + fmt(total) + (cur ? ' · running step ' + cur.id : '') : '';
+  };
+  tick();
+  if (s.running) timer = setInterval(tick, 500);
+}
+
+function addLog(e) {
+  const box = $('log'); const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  const line = el('div', e.level, new Date(e.t).toLocaleTimeString() + '  ' + e.msg);
+  box.append(line); if (stick) box.scrollTop = box.scrollHeight;
+}
+
+function connect() {
+  const es = new EventSource('/api/events');
+  es.onopen = () => { $('conn-dot').className = 'dot ok'; $('conn-text').textContent = 'Live'; };
+  es.onerror = () => { $('conn-dot').className = 'dot bad'; $('conn-text').textContent = 'Reconnecting'; };
+  es.addEventListener('snapshot', (e) => render(JSON.parse(e.data)));
+  es.addEventListener('logs', (e) => { $('log').replaceChildren(); JSON.parse(e.data).forEach(addLog); });
+  es.addEventListener('log', (e) => addLog(JSON.parse(e.data)));
+}
+
+$('refresh').onclick = () => post('/api/refresh');
+$('clear-log').onclick = () => $('log').replaceChildren();
+$('reset').onclick = () => { if (confirm('Reset local progress? Contracts already deployed on Sepolia stay on chain; this only clears the UI state so you can deploy a fresh set.')) post('/api/reset'); };
+connect();
+</script>
+</body>
+</html>

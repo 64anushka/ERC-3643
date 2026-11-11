@@ -1,0 +1,20 @@
+{
+  "adminRegistrarBnd" : "0xFC6620B106d31a672960e87D5DC15f68459C6841",
+  "implementationAuthority" : "0x7c444dea2dcb005ac9c881406f54bfc3ea41b6e7",
+  "idFactory" : "0xf557b20842471e1ab4f4b6a9261d8f24db616ddb",
+  "factory" : "0x04a664c6861bc82bc5a31acb647dc5f44e84dbe3",
+  "gateway" : "0x19d2be306bc790d76cadea7f693461af1145fac7",
+  "supplyLimitModule" : "0x9224baf6d0783a3f176f87bfbd0e26268175ed48",
+  "cashToken" : "0x1dc66797e267455fd72d2038aa998adf747c17d8",
+  "dvd" : "0xf51e489916e61f0145d7f65d252c9d783869fdcf",
+  "token" : "0xDa41D6c5037a817cD875480f474F98F702180d77",
+  "identityRegistry" : "0x5f92fc39b4fBB1fC3C333FF6F85BC51ca3Cc1a91",
+  "compliance" : "0x3341DfC10D7b44aa9Aa0E40bD196a912509cCc75",
+  "tokenName" : "payment token",
+  "tokenSymbol" : "usdt",
+  "supplyLimit" : 5000,
+  "pricePerBondRaw" : 100000000,
+  "whitelisted" : [ "0xFC6620B106d31a672960e87D5DC15f68459C6841", "0xE815a5f6EB9Bb87f7c2Bc742a1C7B7388f29Df06", "0x4C62EA571503ad12E57328cAF1b2C98340E78a0F" ],
+  "funded" : [ "0xE815a5f6EB9Bb87f7c2Bc742a1C7B7388f29Df06", "0x4C62EA571503ad12E57328cAF1b2C98340E78a0F" ],
+  "deployedAt" : "2026-11-09T06:51:55.852271300Z"
+}
